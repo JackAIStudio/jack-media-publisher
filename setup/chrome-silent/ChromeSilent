@@ -1,0 +1,44 @@
+#!/bin/bash
+# Chrome Silent —— 带 --silent-debugger-extension-api 启动 Chrome，
+# 从而不显示「XXX 已开始调试此浏览器」的顶部横幅。
+# 若 Chrome 已在运行，先优雅退出再重启（标签页会被 Chrome 恢复）。
+
+FLAG="--silent-debugger-extension-api"
+CHROME="/Applications/Google Chrome.app"
+
+if [ ! -d "$CHROME" ]; then
+  osascript -e 'display alert "找不到 Google Chrome" message "请先安装 Google Chrome。" as critical' >/dev/null 2>&1
+  exit 1
+fi
+
+if pgrep -x "Google Chrome" >/dev/null 2>&1; then
+  # Chrome 在跑：先征求同意（避免丢失未保存的表单内容）
+  ANSWER=$(osascript <<'AS' 2>/dev/null
+tell application "System Events"
+  activate
+  display dialog "Chrome 正在运行，需要重启一次才能隐藏调试横幅。" & return & return & ¬
+    "标签页会被 Chrome 自动恢复。是否继续？" ¬
+    buttons {"取消", "重启 Chrome"} default button "重启 Chrome" with title "Chrome Silent" with icon note giving up after 60
+end tell
+AS
+)
+  case "$ANSWER" in
+    *"重启 Chrome"*) ;;
+    *) exit 0 ;;
+  esac
+
+  # 优雅退出：Chrome 自己会处理未保存内容的提示
+  osascript -e 'tell application "Google Chrome" to quit' >/dev/null 2>&1
+  # 最多等 15 秒
+  for i in $(seq 1 30); do
+    pgrep -x "Google Chrome" >/dev/null 2>&1 || break
+    sleep 0.5
+  done
+  if pgrep -x "Google Chrome" >/dev/null 2>&1; then
+    osascript -e 'display alert "Chrome 没有退出" message "可能还有页面在等待确认。请手动退出 Chrome 后再启动。" as warning' >/dev/null 2>&1
+    exit 1
+  fi
+  sleep 1
+fi
+
+open -a "$CHROME" --args "$FLAG"
