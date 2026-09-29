@@ -107,16 +107,38 @@ open -a "Google Chrome" --args --silent-debugger-extension-api
 
 ## 四、BrowserSkill 扩展需要「允许访问文件网址」
 
-没有这个权限时，文件上传会报：
+没有这个权限时，文件上传会报（**两种措辞都遇到过，都要认出来**）：
 
 ```
 cdp_failed: {"code":-32000,"message":"Not allowed"}
 phase: set_files
 ```
 
+2026-09-29 实测的另一种措辞（默认 `input` 模式）：
+
+```
+error: the browser could not attach the staged file to the input
+hint: check that BrowserSkill has Chrome's 'Allow access to file URLs' permission; otherwise use `bsk request-help`
+details: {"code":-32000,"message":"Not allowed"}
+```
+
+以及 `--mode drop` 下的第三种：
+
+```
+error: the browser could not complete the native file drop
+details: {"code":-32602,"message":"Not allowed"}
+```
+
+**关键：`bsk status` 和 `bsk doctor` 在这个状态下【全绿】。** 光看状态发现不了，必须实传一次文件（见 SKILL.md 步骤 0 的探针）。
+
+**用大文件和小文件报同一个错**，就能排除"文件太大"，直接锁定是权限问题（实测：76 MB 的视频和 630 KB 的封面报的错一模一样）。
+
 **开启方式**：`chrome://extensions` → BrowserSkill → 详情 → 打开「**允许访问文件网址**」。
+直达链接：`chrome://extensions/?id=hhcmgoofomhgciiibhipgmgkgnoenaoi`
 
 **注意是 BrowserSkill 那个扩展**，不是别的。
+
+⚠️ **这个权限开了之后，已经存在的 bsk session 不会自动复活** —— 重新 `bsk session start` 再传。
 
 ---
 
@@ -242,5 +264,65 @@ V2（文件名）、生活记录、记录、日语现场、音乐现场、LIVE
 - **B站封面编辑器**新增「智能生成封面」弹窗，要先点「不使用」才能进手动上传
 - **B站封面**从"两个并排上传区"改成"4:3 / 16:9 双面板"
 - **小红书封面**引入新版编辑器（带模板/贴纸），大视频会失败
+- **视频号封面**（2026-09-29 实测）**从双槽改成了【单一 3:4 槽】**——页面上写的是「个人主页和分享卡片(3:4)」，不再有单独的 4:3 分享卡片槽。所以横屏封面在视频号**没有槽可放**，别以为漏传了
+- **小红书「内容类型声明」**（2026-09-29 实测）**四个选项里没有"无需声明"**（虚构演绎 / 笔记含AI合成内容 / 内容包含营销广告 / 内容来源声明）——**留空就是"无需声明"的表达**
 
 **所以这份文档里的选择器都有保鲜期。失效时先怀疑改版，不要怀疑自己的操作。**
+
+---
+
+## 十三、隐藏的 file input 会被 bsk 拒掉（四个平台全踩）
+
+四个平台的 file input **全都是隐藏的**（`0×0` / `opacity:0` / `display:none`）。直接拿 input 当 target：
+
+```
+error: target element has no visible geometry
+hint: rerun snapshot and choose a visible child ref, or wait/scroll/reload before retrying
+```
+
+**这不是权限问题，也不是操作问题——那个元素本来就不占位。**
+
+**修法**：指向**可见的投放区**（小红书/抖音 `div.drag-over`、B站 `.bcc-upload-wrapper div.upload-area`、视频号用 `--ref` 指可见区）。完整的可见祖先探针见 `selectors.md` 的「文件上传」节。
+
+⚠️ 这条和第四条（文件访问权限）**报错完全不同**，别混：几何问题报 `no visible geometry`（本地就能判断），权限问题报 `Not allowed`（要动浏览器设置）。
+
+---
+
+## 十四、B站 有些词是「仅话题」，在标签框里会静默消失
+
+实测（2026-09-29）`WorkBuddy`：标签框里**打字 → 回车 → 文字被清空、标签不落地、连报错都没有**。
+
+同批的 `DeepSeek` / `Kimi` / `AI` 都正常，所以**不是大小写、不是英文、不是输入法的问题**。
+
+**根因**：B站 有些词只作为**话题**存在（WorkBuddy 话题页 993.4 万次播放），不能当自定义标签。
+
+**解法（实测有效）**：
+
+```
+参与话题  →  搜索更多话题  →  搜索框输入词  →  选中该话题  →  确定
+```
+
+走完这条路，`WorkBuddy` 会出现在 `.label-item-v2-content` 里（标签 7 → 8 个，存盘复查后仍在）。
+
+**兜底**：这条路也走不通时，**留成一条明确的待办报给 Jack，绝不悄悄换成别的词**（oil-oil 文档的明确要求：*Do not silently drop or replace the requested tag.*）。
+
+---
+
+## 十五、bsk session 会因为「中断」或「超时」整个消失
+
+实测两次踩到：
+
+| 触发 | 后果 |
+|---|---|
+| `bsk request-help` 被 abort（用户在 Agent Window 按了停止） | session 直接没了 |
+| 长时间不操作 | session idle 超时关闭（默认 5 分钟，见第二条） |
+
+**后果**：**已开的 Agent Window 和里面所有 tab 全丢**，正在做的平台要从头再来一遍。（平台侧的草稿是存住的，续做时按 SKILL.md 的幂等三态判定，**不要重放上传**。）
+
+**所以三件事**：
+
+1. 按第二条把 session idle 调长（`bsk daemon restart --session-idle 4h --daemon-idle 8h`）；
+2. **开工前把环境自检一次做完**（尤其第四条的文件访问权限），别做到一半因为环境问题被打断；
+3. 中断后先跑 `bsk session list` / `bsk browsers`，再 `bsk session start` + 从平台当前状态续做。
+
+⚠️ 收到「用户中断」信号时，按 SKILL.md 硬边界**立即停手问用户**，不要自行重试。

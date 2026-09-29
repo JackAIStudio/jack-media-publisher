@@ -6,14 +6,37 @@
 
 ## 文件上传
 
-| 平台 | 选择器 | 说明 |
-|---|---|---|
-| 小红书 | `input.upload-input` | 视频口。带 `accept` 校验 |
-| 抖音 | `input[type=file]`（页面唯一） | accept 含 `video/*` |
-| **B站** | **`.bcc-upload-wrapper input[type=file]`** | ⚠️ 关键，见下 |
-| 视频号 | **需穿透 wujie shadow root** | 见下 |
+### 用「可见投放区」，不要用 file input 本身
 
-### ⚠️ B站：必须限定在 wrapper 里
+**四个平台的 file input 都是隐藏的**（`0×0` / `opacity:0` / `display:none`）。2026-09-29 实测：直接选 input 会被 bsk 拒掉：
+
+```
+error: target element has no visible geometry
+hint: rerun snapshot and choose a visible child ref, or wait/scroll/reload before retrying
+```
+
+**这不是操作错，是那个元素本来就不占位。** 用可见的投放区当 target：
+
+| 平台 | ✅ 用这个（可见投放区） | ❌ 不要用这个（隐藏 input） |
+|---|---|---|
+| 小红书 | `div.drag-over` | `input.upload-input`（0×0 / opacity 0） |
+| 抖音 | `div.drag-over` | `input[type=file]`（页面唯一但不可见） |
+| **B站** | **`.bcc-upload-wrapper div.upload-area`** | `.bcc-upload-wrapper input[type=file]` |
+| 视频号 | `--ref '@eNN'` 指向可见上传区 | shadow DOM 里的 `input[type=file]` |
+
+**找可见祖先的通用探针**：
+
+```js
+(() => { const inp = document.querySelector('<input 选择器>'); const out = []; let e = inp;
+  for (let i = 0; i < 8 && e; i++) { const r = e.getBoundingClientRect();
+    out.push([i, e.tagName + '.' + String(e.className).slice(0, 36), Math.round(r.width) + 'x' + Math.round(r.height),
+              getComputedStyle(e).opacity]); e = e.parentElement; }
+  return out; })()
+```
+
+实测小红书 `input.upload-input` 是 `0x0 / opacity 0`，它的父层 `div.drag-over` 是 `1206x351` —— 挑有实际尺寸的那层。
+
+### ⚠️ B站：还要限定在 wrapper 里
 
 B站 页面上有 **3 个 file input**，其中有个 1×1 的"僵尸 input"：
 
@@ -24,7 +47,7 @@ n:2  name="buploader" 可见      accept=".txt"（字幕）
 ```
 
 **用 `input[name=buploader]` 会失败**：框架消费了文件但不启动上传。
-**必须用 `.bcc-upload-wrapper input[type=file]`。**
+**必须限定在 `.bcc-upload-wrapper` 里**，并且指向其中的 `div.upload-area`。
 
 > 这条来自 oil-oil 的 `ego-browser-workflow.md`：
 > *"Bilibili may keep detached 1×1 video inputs next to the active uploader. Scope upload to `.bcc-upload-wrapper input[type=file]`."*
@@ -125,6 +148,27 @@ document.execCommand('insertText', false, '要填的内容');
 
 **⚠️ 空输入框时不要按 Backspace**——B站 会把它理解成"删除最后一个标签"。
 
+#### ⚠️ 有些词是「仅话题」，在标签框里会被静默吞掉
+
+实测（2026-09-29）：`WorkBuddy` 在标签框里**打字 → 回车 → 文字被清空、标签不落地、连报错都没有**。
+同批的 `DeepSeek` / `Kimi` / `AI` 都正常，所以不是大小写或英文的问题。
+
+**根因**：B站 有些词只作为**话题**存在（WorkBuddy 话题页 993.4 万次播放），不能当自定义标签。
+oil-oil 文档的说法：
+
+> If Bilibili reports that a requested tag is **topic-only and cannot be added as a custom tag**...
+> **Do not silently drop or replace the requested tag.**
+
+**解法：走「参与话题」，它会落成标签 chip。**
+
+```
+参与话题  →  搜索更多话题  →  搜索框输入词  →  选中该话题  →  确定
+```
+
+实测走完这条路，`WorkBuddy` 出现在 `.label-item-v2-content` 里（标签从 7 个变 8 个，存盘后复查仍在）。
+
+**如果这条路也走不通**：**留成一条明确的待办报给 Jack，不要悄悄换成别的词。**
+
 ### 视频号
 
 **没有建议面板。** `#话题` 文本会被平台识别（`span.hl.topic`），直接写进描述即可。
@@ -155,13 +199,43 @@ input.upload-input[accept*="image"]
 
 ```
 .cover-editor-panel-canvas-title     ← 两个面板的标题
-  ├─ 首页推荐封面（4:3）   → [class*=editor_4_3]
-  └─ 个人空间封面（16:9）  → [class*=editor_16_9]
+  ├─ #editor_4_3    首页推荐封面（4:3）
+  └─ #editor_16_9   个人空间封面（16:9）
 ```
 
-**上传前必须先确认目标面板处于 active 状态**，否则图会进错的槽。
+**⚠️ 面板 id 就是 `#editor_4_3` / `#editor_16_9`，而 `active` 类在它们的【父元素】上**，不在面板自己身上。
 
-激活方式（mousedown → mouseup → click 三连，派发到目标面板元素）。
+2026-09-29 实测（这正是当时验证错的地方）：
+
+```js
+// ❌ 错：查面板自己的 className —— 永远拿不到 active
+// ✅ 对：查父元素的 class token
+const tok = el => el.parentElement.className.split(/\s+/);
+tok(document.querySelector('#editor_4_3'));    // ["active"]
+tok(document.querySelector('#editor_16_9'));   // ["inactive"]
+```
+
+⚠️ 用 `/active/.test(className)` 会**误判** —— 它会匹配上 `inactive`。必须按空格切成 token 再比。
+
+激活方式（mousedown → mouseup → click 三连，派发到目标面板元素），**然后回读父元素 token 确认真的切过去了**。
+
+**⚠️「完成」不是原生 button，是 `div.button.submit`。**
+
+```js
+document.querySelector('.button.submit')   // <div class="button submit">完成</div>
+```
+
+真点击通常有效；若被框架吞掉，可以**通过页面框架调这一个精确控件一次**（oil-oil 的 `frameworkFallbackUsed`），但**绝不允许把 fallback 扩大到文本搜索或任何最终发布控件**。
+
+**验收「两个槽是两份来源」**（CDN 是内容寻址的，URL 可能不变，不能只看 URL）：
+
+```js
+// 两个面板 canvas 各取中心点 + 左上角：中心像、边角不像 = 两份不同来源
+const read = id => { const cv = document.querySelector('#' + id + ' canvas'); const ctx = cv.getContext('2d');
+  return { size: [cv.width, cv.height],
+           center: [...ctx.getImageData(cv.width >> 1, cv.height >> 1, 1, 1).data.slice(0, 3)],
+           topleft: [...ctx.getImageData(2, 2, 1, 1).data.slice(0, 3)] }; };
+```
 
 ### 抖音：横竖两个 tab
 

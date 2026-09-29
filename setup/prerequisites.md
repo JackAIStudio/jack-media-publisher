@@ -32,13 +32,25 @@ bsk daemon restart --session-idle 4h --daemon-idle 8h
 
 ### ⚠️ 必做：给扩展开「允许访问文件网址」
 
-没有这个权限，文件上传会报 `cdp_failed: Not allowed`。
+**没有这个权限，文件上传一定失败。报错有三种措辞，都要认出来：**
+
+```
+cdp_failed: {"code":-32000,"message":"Not allowed"}          phase: set_files
+error: the browser could not attach the staged file to the input
+error: the browser could not complete the native file drop   {"code":-32602,...}
+```
 
 ```
 chrome://extensions  →  BrowserSkill  →  详情  →  打开「允许访问文件网址」
 ```
 
+直达链接：`chrome://extensions/?id=hhcmgoofomhgciiibhpipgmgkgnoenaoi`
+
 **注意是 BrowserSkill 那个扩展。**
+
+⚠️ **这个状态下 `bsk status` 和 `bsk doctor` 是【全绿】的** —— 2026-09-29 实测就是一路绿到小红书上传才发现，白跑一趟。所以**下面验证清单的第 3 步不是可选项，是开工前的必跑项**。
+
+⚠️ **权限开完之后，已经存在的 bsk session 不会自动复活** —— 重新 `bsk session start` 再传。
 
 ---
 
