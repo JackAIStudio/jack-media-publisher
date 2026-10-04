@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>标题字数</title>
+<style>
+  :root {
+    --bg: #f3f1ec;
+    --ink: #1c1b19;
+    --muted: #6f6a62;
+    --line: #e3dfd6;
+    --card: #fffcf8;
+    --ok: #1d6b45;
+    --ok-soft: #e5f2ea;
+    --warn: #8a5a00;
+    --warn-soft: #fff4dc;
+    --over: #a32018;
+    --over-soft: #fde8e4;
+    --shadow: 0 1px 0 rgba(28, 27, 25, 0.04), 0 12px 32px rgba(28, 27, 25, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 480px at 10% -10%, #fff, transparent 60%),
+      var(--bg);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+    letter-spacing: 0.01em;
+  }
+
+  main {
+    width: min(920px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 48px 0 64px;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 640;
+    letter-spacing: -0.03em;
+  }
+
+  header p {
+    margin: 8px 0 0;
+    max-width: 46em;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .field {
+    margin-top: 28px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 18px 18px 14px;
+  }
+
+  .field label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--ink);
+    font: 620 22px/1.45 "PingFang SC", "Hiragino Sans GB", sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  input::placeholder { color: #b7b1a7; }
+
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  button.copy {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  button.copy:hover { color: var(--ink); }
+
+  .meters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 18px 18px 16px;
+  }
+
+  .card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .name {
+    font-size: 15px;
+    font-weight: 640;
+  }
+
+  .name small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .count {
+    font-variant-numeric: tabular-nums;
+    font-size: 40px;
+    font-weight: 640;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .count span {
+    color: var(--muted);
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  .bar {
+    height: 6px;
+    margin: 16px 0 12px;
+    border-radius: 99px;
+    background: #ece8e1;
+    overflow: hidden;
+  }
+
+  .bar i {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: var(--ok);
+    transition: width 160ms ease;
+  }
+
+  .state {
+    min-height: 1.4em;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .detail {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .card.ok { background: linear-gradient(180deg, var(--ok-soft), var(--card) 42%); }
+  .card.ok .count,
+  .card.ok .state { color: var(--ok); }
+  .card.warn { background: linear-gradient(180deg, var(--warn-soft), var(--card) 42%); }
+  .card.warn .count,
+  .card.warn .state { color: var(--warn); }
+  .card.warn .bar i { background: var(--warn); }
+  .card.over { background: linear-gradient(180deg, var(--over-soft), var(--card) 48%); }
+  .card.over .count,
+  .card.over .state { color: var(--over); }
+  .card.over .bar i { background: var(--over); }
+  .card.idle .count { color: var(--ink); }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 22px;
+  }
+
+  .chips span {
+    width: 100%;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .chips button {
+    border: 1px solid var(--line);
+    background: rgba(255, 252, 248, 0.7);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font: 13px/1.3 "PingFang SC", sans-serif;
+    cursor: pointer;
+  }
+
+  .chips button:hover { border-color: #cfc8bb; background: white; }
+
+  .notes {
+    margin-top: 28px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .notes strong { color: var(--ink); font-weight: 620; }
+
+  .check {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .check.pass { color: var(--ok); }
+  .check.fail { color: var(--over); }
+
+  @media (max-width: 720px) {
+    main { padding-top: 28px; }
+    .meters { grid-template-columns: 1fr; }
+    .count { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>标题字数</h1>
+    <p>不用先上传视频。这里按 2026-09-15 在小红书、抖音发布页里逐条填进去的读数来算。真要发的时候，仍以页上那个计数器为准。</p>
+  </header>
+
+  <div class="field">
+    <label for="title">标题</label>
+    <input id="title" type="text" autocomplete="off" spellcheck="false" placeholder="写一句，两边一起跳" autofocus>
+    <div class="field-row">
+      <span id="plain">还没写</span>
+      <button class="copy" type="button" id="copy">复制</button>
+    </div>
+  </div>
+
+  <section class="meters" aria-live="polite">
+    <article class="card idle" id="xhs-card">
+      <header>
+        <div class="name">小红书<small>标题上限 20</small></div>
+        <div class="count" id="xhs-count">0 <span>/ 20</span></div>
+      </header>
+      <div class="bar"><i id="xhs-bar"></i></div>
+      <div class="state" id="xhs-state">还剩 20</div>
+      <div class="detail" id="xhs-detail">汉字和全角标点算 1，英文、数字、半角空格和半角标点算 0.5，加总后向上取整。</div>
+    </article>
+    <article class="card idle" id="dy-card">
+      <header>
+        <div class="name">抖音<small>作品描述上限 30</small></div>
+        <div class="count" id="dy-count">0 <span>/ 30</span></div>
+      </header>
+      <div class="bar"><i id="dy-bar"></i></div>
+      <div class="state" id="dy-state">还剩 30</div>
+      <div class="detail" id="dy-detail">一个字符算 1。发布页里 🔥 实测算 2。</div>
+    </article>
+  </section>
+
+  <div class="chips">
+    <span>拿这期先试</span>
+    <button type="button" data-fill="学AI根本不用那么复杂">学AI根本不用那么复杂</button>
+    <button type="button" data-fill="打个你好AI就用好了">打个你好AI就用好了</button>
+    <button type="button" data-fill="用AI只要打个你好">用AI只要打个你好</button>
+    <button type="button" data-fill="一分钟把AI用起来">一分钟把AI用起来</button>
+    <button type="button" data-fill="两个软件就能把AI用上">两个软件就能把AI用上</button>
+    <button type="button" data-fill="给Agent装个Skill，后台控制浏览器">发布页校准句</button>
+  </div>
+
+  <div class="notes">
+    <strong>小红书</strong>先加权，再向上取整。所以 <strong>Agent</strong> 加权是 2.5，发布页显示 <strong>3</strong>。同一个空格也算 0.5，<strong>给 Agent</strong> 比 <strong>给Agent</strong> 多半个字。<br>
+    <strong>抖音</strong>不打折。同一句「给Agent装个Skill，后台控制浏览器」在小红书是 16/20，在抖音是 21/30。<br>
+    小红书的 emoji 当时没单测，页面上会标明，不要把抖音的 2 套过去。半角标点按发布规则里的 ASCII 0.5 来计，这一类没有单独的读数。
+    <div class="check" id="check">正在核对实测样例…</div>
+  </div>
+</main>
+
+<script id="counter">
+const XHS_LIMIT = 20;
+const DY_LIMIT = 30;
+
+function analyze(text) {
+  let letters = 0;
+  let digits = 0;
+  let spaces = 0;
+  let asciiPunct = 0;
+  let other = 0;
+  let nonBmp = 0;
+  let emoji = false;
+
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    if (cp > 0xffff) nonBmp += 1;
+    if (isEmoji(cp)) emoji = true;
+    if (cp <= 0x7f) {
+      if (ch === " ") spaces += 1;
+      else if (ch >= "0" && ch <= "9") digits += 1;
+      else if ((ch >= "A" && ch <= "Z") || (ch >= "a" && ch <= "z")) letters += 1;
+      else asciiPunct += 1;
+    } else {
+      other += 1;
+    }
+  }
+
+  const ascii = letters + digits + spaces + asciiPunct;
+  const weight = other + ascii * 0.5;
+  return {
+    letters,
+    digits,
+    spaces,
+    asciiPunct,
+    other,
+    nonBmp,
+    emoji,
+    weight,
+    xhs: Math.ceil(weight),
+    dy: text.length
+  };
+}
+
+function isEmoji(cp) {
+  return (cp >= 0x2600 && cp <= 0x27bf) || cp >= 0x1f300;
+}
+
+const MEASURED = [
+  ["Agent", 3, 5],
+  ["aaaaaaaaaa", 5, 10],
+  ["，，", 2, 2],
+  ["a a", 2, 3],
+  ["，。", 2, 2],
+  ["给Agent装个Skill，后台控制浏览器", 16, 21]
+];
+
+function runChecks() {
+  const failures = [];
+  for (const [text, xhs, dy] of MEASURED) {
+    const got = analyze(text);
+    if (got.xhs !== xhs || got.dy !== dy) {
+      failures.push(`${text} → 小红书 ${got.xhs}（应 ${xhs}），抖音 ${got.dy}（应 ${dy}）`);
+    }
+  }
+  const fire = analyze("🔥");
+  if (fire.dy !== 2) failures.push(`🔥 抖音 ${fire.dy}（应 2）`);
+  return failures;
+}
+
+function paint(text) {
+  const stats = analyze(text);
+  paintPlatform("xhs", stats.xhs, XHS_LIMIT, xhsDetail(text, stats));
+  paintPlatform("dy", stats.dy, DY_LIMIT, dyDetail(stats));
+  const plain = document.getElementById("plain");
+  plain.textContent = text ? `原文 ${[...text].length} 个符号` : "还没写";
+}
+
+function paintPlatform(prefix, used, limit, detail) {
+  const card = document.getElementById(`${prefix}-card`);
+  const count = document.getElementById(`${prefix}-count`);
+  const bar = document.getElementById(`${prefix}-bar`);
+  const state = document.getElementById(`${prefix}-state`);
+  const ratio = limit === 0 ? 0 : Math.min(used / limit, 1);
+  count.innerHTML = `${used} <span>/ ${limit}</span>`;
+  bar.style.width = `${ratio * 100}%`;
+  card.classList.remove("idle", "ok", "warn", "over");
+  if (!document.getElementById("title").value) {
+    card.classList.add("idle");
+    state.textContent = `还剩 ${limit}`;
+  } else if (used > limit) {
+    card.classList.add("over");
+    state.textContent = `超了 ${used - limit}`;
+  } else if (limit - used <= 3) {
+    card.classList.add("warn");
+    state.textContent = `还剩 ${limit - used}`;
+  } else {
+    card.classList.add("ok");
+    state.textContent = `还剩 ${limit - used}`;
+  }
+  document.getElementById(`${prefix}-detail`).textContent = detail;
+}
+
+function formatWeight(weight) {
+  return Number.isInteger(weight) ? String(weight) : weight.toFixed(1);
+}
+
+function xhsDetail(text, stats) {
+  if (!text) return "汉字和全角标点算 1，英文、数字、半角空格和半角标点算 0.5，加总后向上取整。";
+  const parts = [];
+  if (stats.other) parts.push(`汉字等 ${stats.other} × 1`);
+  const asciiBits = [];
+  if (stats.letters) asciiBits.push(`字母 ${stats.letters}`);
+  if (stats.digits) asciiBits.push(`数字 ${stats.digits}`);
+  if (stats.spaces) asciiBits.push(`空格 ${stats.spaces}`);
+  if (stats.asciiPunct) asciiBits.push(`半角标点 ${stats.asciiPunct}`);
+  if (asciiBits.length) parts.push(`${asciiBits.join("、")} × 0.5`);
+  const shown = stats.weight === stats.xhs
+    ? `加权 ${formatWeight(stats.weight)}，显示 ${stats.xhs}`
+    : `加权 ${formatWeight(stats.weight)}，向上取整后显示 ${stats.xhs}`;
+  let line = `${parts.join("，")}。${shown}。`;
+  if (stats.emoji || stats.nonBmp) {
+    line += " 这里的 emoji 小红书没单测，先按 1 个符号估算。";
+  }
+  if (stats.asciiPunct) {
+    line += " 半角标点没有单独的发布页读数。";
+  }
+  return line;
+}
+
+function dyDetail(stats) {
+  if (!document.getElementById("title").value) return "一个字符算 1。发布页里 🔥 实测算 2。";
+  if (stats.nonBmp || stats.emoji) {
+    return `按发布页的算法计 ${stats.dy}。像 🔥 这样的 emoji 实测算 2，不是 1。`;
+  }
+  return `按发布页的算法计 ${stats.dy}。汉字、字母、数字、空格、标点都是 1。`;
+}
+
+const title = document.getElementById("title");
+title.addEventListener("input", () => paint(title.value));
+
+for (const button of document.querySelectorAll("[data-fill]")) {
+  button.addEventListener("click", () => {
+    title.value = button.dataset.fill;
+    title.focus();
+    paint(title.value);
+  });
+}
+
+document.getElementById("copy").addEventListener("click", async () => {
+  const button = document.getElementById("copy");
+  const value = title.value;
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    button.textContent = "已复制";
+  } catch {
+    title.select();
+    button.textContent = "已选中";
+  }
+  setTimeout(() => { button.textContent = "复制"; }, 1200);
+});
+
+const failures = runChecks();
+const check = document.getElementById("check");
+if (failures.length === 0) {
+  check.classList.add("pass");
+  check.textContent = "自检通过：6 句发布页读数，加上抖音的 🔥，都和 2026-09-15 的记录一致。";
+} else {
+  check.classList.add("fail");
+  check.textContent = `自检没过：${failures.join("；")}`;
+}
+
+paint("");
+</script>
+</body>
+</html>
