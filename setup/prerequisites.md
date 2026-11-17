@@ -1,6 +1,6 @@
 # 环境前置
 
-**这套流程依赖三样东西，缺任何一个都会跑不起来或跑一半崩。** 换新机器时先过一遍这份清单。
+新机器先确认 BrowserSkill 能连接到指定的 Chrome，并用无业务内容的小文件验证原生文件选择。长任务可预设会话超时，静默启动器按需安装。
 
 ---
 
@@ -20,15 +20,15 @@ bsk status
 
 **扩展安装**：见 <https://github.com/Tencent/BrowserSkill> 的 Quick Start。
 
-### ⚠️ 必做：调长会话空闲超时
+### 长任务的会话空闲时间
 
-**默认 5 分钟空闲就会关掉会话窗口**，导致你埋头调一个平台时，其他平台的页面被关、草稿丢失。
+默认 5 分钟空闲可能关闭任务窗口。从草稿箱能找回已保存的字段，未保存的编辑可能丢失。需要调长时，在开始任务前确认 daemon 内所有窗口都可关闭，然后按需设置：
 
 ```bash
 bsk daemon restart --session-idle 4h --daemon-idle 8h
 ```
 
-**这不是优化项，是必需项。** 详见 `references/gotchas.md` 第二条。
+已有上传、未保存草稿或待人工复核的页面时保留原会话。见[留页交接或关闭专用会话](../SKILL.md#7-留页交接或关闭专用会话)。
 
 ### ⚠️ 必做：给扩展开「允许访问文件网址」
 
@@ -44,11 +44,7 @@ error: the browser could not complete the native file drop   {"code":-32602,...}
 chrome://extensions  →  BrowserSkill  →  详情  →  打开「允许访问文件网址」
 ```
 
-直达链接：`chrome://extensions/?id=hhcmgoofomhgciiibhpipgmgkgnoenaoi`
-
-**注意是 BrowserSkill 那个扩展。**
-
-⚠️ **这个状态下 `bsk status` 和 `bsk doctor` 是【全绿】的** —— 2026-09-29 实测就是一路绿到小红书上传才发现，白跑一趟。所以**下面验证清单的第 3 步不是可选项，是开工前的必跑项**。
+在当前浏览器配置的扩展列表里打开 BrowserSkill 详情页，由用户管理这个权限。`bsk status` 和 `bsk doctor` 可能仍显示正常，开工前按下方验证清单实测原生文件选择。
 
 ⚠️ **权限开完之后，已经存在的 bsk session 不会自动复活** —— 重新 `bsk session start` 再传。
 
@@ -91,26 +87,9 @@ Node.js         ≥ 20（bsk CLI 需要）
 
 ## 验证清单
 
-跑完上面三步后，这套命令应该全部通过：
-
-```bash
-# 1) bsk 基本状态
-bsk status | grep -E "browsers|sessions"
-
-# 2) 浏览器连接
-bsk browsers
-
-# 3) 扩展权限（应无 cdp_failed 报错）
-bsk session start
-bsk navigate --session <id> "https://the-internet.herokuapp.com/upload"
-echo '{"a":1}' > /tmp/t.txt
-bsk upload --session <id> --file /tmp/t.txt --selector 'input[type=file]'
-bsk evaluate --session <id> "JSON.stringify({n:document.querySelector('input[type=file]').files.length})"
-# 期望：{"n":1}
-
-# 4) 大文件注入
-./scripts/inject-large-file.sh /path/to/big.mp4 'input[type=file]' --session <id>
-```
+1. 确认浏览器已连接到当前宿主，需要指定配置时核对实例。
+2. 在独立测试页实测原生文件选择。可在 `https://the-internet.herokuapp.com/upload` 的文件框选择一份无业务内容的小探针。读取 `files[0].name` 和 `files[0].size`，和本地文件对照。测完关闭测试页即可。
+3. 实际需要单文件本机交付时再启动助手；具体用法和回执见[单文件本机交付](../references/gotchas.md#单文件本机交付)。DSH 通过已绑定的 `bsk_*` 会话与页面交互。
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: jack-media-publisher
-description: 把一条视频准备成小红书 / 抖音 / B站 / 微信视频号的发布草稿——上传视频、填标题与真实话题实体、设内容声明（默认「无需标注」）、传多比例封面，每个平台独立验收，最后停在最终发布按钮之前交给人工确认。不负责剪辑、转码、生成封面，也不点击最终发布。**仅限人工显式调用**：只有用户在输入框里亲手打出 `/jack-media-publisher` 才执行，模型不得自行判断触发。
+description: 把一条视频准备成小红书 / 抖音 / B站 / 微信视频号的发布草稿——上传视频、填标题与真实话题实体、按本条作品选择原创与 AI 内容声明、传多比例封面，每个平台独立验收，最后停在最终发布按钮之前交给人工确认。不负责剪辑、转码、生成封面，也不点击最终发布。**仅限人工显式调用**：只有用户在输入框里亲手打出 `/jack-media-publisher` 才执行，模型不得自行判断触发。
 disable-model-invocation: true
 ---
 
@@ -25,6 +25,7 @@ disable-model-invocation: true
 | **动手前**（总是） | `references/platforms.md` —— 四平台字段映射 |
 | **填标题 / 核字数时** | `references/title-limits.md` —— 小红书加权 20、抖音 30 怎么算；配套计数页 `tools/title-counter.html` |
 | 需要精确选择器 | `references/selectors.md` |
+| 判断 B站分区 | [投稿页实取分区及选择示例](references/bilibili-categories.md) |
 | **每次验收**（总是） | `references/verification.md` |
 | 遇到失败或平台改版 | `references/gotchas.md` |
 | 新机器 / 环境报错 | `setup/prerequisites.md` |
@@ -35,12 +36,11 @@ disable-model-invocation: true
 
 - **绝不点击任何最终发布按钮**：`发布` / `发布笔记` / `发表` / `立即投稿` / `发布`（抖音）。任何平台都不行。
 - **绝不点「安排时间」「定时发布」。**
-- **不要从视频内容自行推断是否勾选原创/自制声明**——只按用户的明确指示。
-- **内容声明**（小红书的「内容类型声明」/ 抖音的「自主声明」/ B站的「创作声明」/ 视频号的「视频标注」）：**一律「无需标注」/ 不选**。
-  ⚠️ 2026-09-29 起翻转：Jack 不再用 AI 做封面，这条从「默认勾选 AI 声明」改成「默认无需标注」。**四个平台字段名和值都不一样，别拿一个平台的值去套另一个**（映射表见 `references/platforms.md`）。
+- Jack 已授权给本人自制稿勾选平台提供的「原创 / 自制」。明确转载或权属有冲突的稿件按实际来源处理。记录实际字段与选中状态。
+- 根据本条成片中实际展示的素材判断 AI 内容声明。原创与含 AI 可以同时成立。各平台分支和字段名称见[内容声明](references/platforms.md#内容声明)。
 - **不使用平台推荐封面当成品**——只有用户给了封面文件才用；没有就保持默认，不要自作主张。
 - **小红书标题上限是加权 20，且有进位**——不是 20 个字符。填之前按 [`references/title-limits.md`](references/title-limits.md) 算；**未超限时必须保留原标题，不要自作聪明截断**。
-- 遇到「用户接管浏览器」类中断信号，**立即停止全部浏览器操作**，问用户如何处理，不自行重试。
+- 收到真人接管或中断信号时，**立即停止全部浏览器操作**，保留各平台已有进度并询问如何交接。用户明确交回后，在原会话等待 `ready=true`，重新同步，先回读字段再续做。`editing=true` 表示控件仍被占用，记录等待时间即可。
 
 ---
 
@@ -52,8 +52,8 @@ disable-model-invocation: true
 3. B站简介        默认不写
 4. 小红书正文     默认不写（只放话题）
 5. 视频号位置     默认设为「不显示位置」；短标题禁中文逗号
-6. 原创声明       默认不开
-7. 内容声明       一律「无需标注」/ 不选（2026-09-29 起；此前默认勾选 AI 声明）
+6. 原创声明       本人自制稿在平台有原创/自制选项时勾选
+7. 内容声明       展示 AI 生成素材选含 AI 内容；纯实拍生活 vlog 按普通内容处理
 ```
 
 ---
@@ -62,92 +62,47 @@ disable-model-invocation: true
 
 ### 0. 环境自检
 
-```bash
-bsk status                      # daemon 与浏览器连接
-bsk browsers                    # 应有 chrome 连着
-```
+在 DSH 中使用当前宿主注入的 `bsk_*` 工具操作页面。绑定本次会话、标签页和已核实的登录账号。需要指定浏览器配置时，沿用已核实的实例。先同步页面再操作，离页或人工交还后重新同步。独立 CLI 环境可用 `bsk status`、`bsk browsers` 检查连接。
 
-**⚠️ 光看状态不够 —— 必须实测「上传通路」再开工。**
+开工前用无业务内容的小文件实测一次原生文件选择。在测试表单的可见文件控件上选择探针，读回文件名和字节数后关闭测试页。本轮同一浏览器已有成功记录即可沿用。只有这两项吻合才算文件选择通路可用。
 
-扩展缺「允许访问文件网址」时，`bsk status` / `bsk doctor` **全绿**，但真正上传文件才炸。2026-09-29 实测：一路绿到小红书上传才发现，白跑一趟。
-
-用 1 KB 小文件先打一发（10 秒）：
-
-```bash
-echo '{"probe":1}' > /tmp/bsk-upload-probe.txt
-S=$(bsk session start --json | python3 -c "import sys,json;print(json.load(sys.stdin)['session_id'])")
-bsk navigate --session $S "https://the-internet.herokuapp.com/upload"
-bsk upload --session $S --file /tmp/bsk-upload-probe.txt --selector 'input[type=file]'
-```
-
-- 期望：`upload ok`
-- 报 `could not attach the staged file to the input` 或 `{"code":-32000,"message":"Not allowed"}` → **去开权限**（`setup/prerequisites.md` 第 1 节），别硬着头皮往下做
-- **用大文件和小文件报同一个错**，就能排除"文件太大"，直接锁定权限问题
-
-**如果会话容易中断**，检查 daemon 是否带了长空闲超时（见 `setup/prerequisites.md`）。
+权限报错（如 `Not allowed`）按[环境前置](setup/prerequisites.md)处理。`covered`、`not topmost` 和 `no visible geometry` 则先查当前控件、可见区域及弹窗。长任务的会话超时在开工前检查。
 
 ### 1. 接收内容包
 
-向用户确认：
+核对用户给的成片、原标题、话题和可选封面。用户已委托选话题时，按内容和平台实际候选直接选；要求过目时先给文案。封面分别核对实际像素。上传后按本条作品的主旨与素材来源选字段。
 
-```
-视频文件绝对路径
-四个平台各自的标题与话题（或由你生成后经用户过目）
-封面文件（按比例映射）——可选
-内容声明：默认一律「无需标注」/ 不选
-原创声明：默认不开
-```
+上传前先看本账号已加载的草稿列表，记录本次新建或沿用的依据。用标题、视频时长、缩略图和保存时间区分同名稿。找到目标后从尚未完成的字段继续；不能区分时保留原稿，请用户指认。
 
 **视频时长与编码先探测**：
 
 ```bash
 ffprobe -v error -show_entries format=duration,size,bit_rate \
-        -show_entries stream=codec_type,codec_name,width,height \
+        -show_entries stream=codec_type,codec_name,width,height,display_aspect_ratio:stream_side_data=rotation \
         -of default=noprint_wrappers=1 "$VIDEO"
 ```
 
 ### 2. 上传视频（四平台）
 
-**先判断文件大小：**
+优先把原片交给当前草稿的可见上传区。原生上传的单文件上限和每个会话累计暂存上限都是 512 MiB。需要大文件或组件兼容交付时，按[单文件本机交付](references/gotchas.md#单文件本机交付)处理。两次操作都没有进展就转入对应故障排查。平台已经开始传输、处理或保存时，留在原稿等回执。
 
-```
-≤ 512 MiB  → bsk 原生 upload（走可信事件，最稳）
-> 512 MiB  → 必须用注入法   scripts/inject-large-file.sh
-```
+根据[各平台上传区](references/selectors.md#文件上传)定位本条草稿的可见控件。DSH 调用 `bsk_interact` 的 `upload`，传本次同步得到的 `contextId`、目标 ref 或可见选择器，以及成片绝对路径。独立 CLI 用 `bsk upload --session "$S" --tab-id "$T" --context "$CTX" --ref "$REF" --file "$V"`，其中 `CTX` 和 `REF` 都来自刚核对的原标签页。
 
-**⚠️ bsk 单文件上限 512 MiB，会话累计也是 512 MiB。** 详见 `references/gotchas.md`。
+`no visible geometry` 时，在已观察的上传卡片内找可见的投放区。微信视频号还要在 wujie 组件内定位。
 
-各平台上传口 —— **⚠️ 全部指向「可见投放区」，不要指向 file input 本身**：
+上传后立即查看平台自己的进度或回执。视频号按[视频号上传排查](references/gotchas.md#视频号上传排查)依次区分文件选择、本地元数据、平台上传及封面绑定。
 
-```bash
-# 小红书  input.upload-input 是 0×0 / opacity:0，直接选它会被拒
-bsk upload --session $S --tab-id $T --file "$V" --selector 'div.drag-over'
-# 抖音    当前快照中取「点击上传 或直接将视频文件拖入此区域」的 ref
-bsk upload --session $S --tab-id $T --file "$V" --ref '@eNN'
-# B站     ⚠️ 必须限定在 wrapper 内，且指向可见投放区
-bsk upload --session $S --tab-id $T --file "$V" --selector '.bcc-upload-wrapper div.upload-area'
-# 视频号  input 在 wujie shadow DOM 且不可见 → 用 --ref 指向可见上传区
-bsk upload --session $S --tab-id $T --file "$V" --ref '@eNN'
-```
+从开始投递就按平台记下实际发生的时间（含时区）：开始投递、文件已选、平台接收或处理完成、人工等待起止、草稿入箱。每个时间附一项页面证据。恢复已有草稿时写「沿用」，无法确定的时间写「未观测」。并行平台的等待单列，保留本次任务的总起止时间。
 
-**报 `target element has no visible geometry` 就是选错元素了**——不是你操作错，是那个输入框本来就不占位。用这段找可见祖先：
+### 3. 上传后判断作品内容并填字段
 
-```js
-(() => { const inp = document.querySelector('<file input 选择器>'); const out = []; let e = inp;
-  for (let i = 0; i < 6 && e; i++) { const r = e.getBoundingClientRect();
-    out.push([i, e.tagName + '.' + String(e.className).slice(0,30), Math.round(r.width) + 'x' + Math.round(r.height)]); e = e.parentElement; }
-  return out; })()
-```
+结合用户说明、原标题和成片本身判断。如果标题不能确定素材来源，就查看有内容的片段（如开场、演示结果和结尾），配合字幕或已有口播稿。封面、文件名和推荐标签只作线索。记录本条的「主旨 / 是否本人自制 / 实际使用的生成素材 / B站分区及理由」，再映射到各平台字段。
 
-挑 rect 有实际尺寸的那一层当 target。
+- 本人录制模型实测且展示生成图、生成视频等结果时，选原创和对应的含 AI 声明，B站通常选「人工智能」。
+- 本人实拍生活 vlog 时选原创。纯实拍按普通内容分支；其中加入 AI 生成片段，也选相应 AI 声明，分区仍以这条视频的生活主线为准。仅讨论 AI 时，按实际素材和字段文案判断。
+- B站从[投稿页实取清单](references/bilibili-categories.md)选本条作品的主分区，先确认该项在当前分区控件中可选，选后回读。原创、自制授权和 AI 标注按页面实际提供的控件分别验收。
 
-**上传后立即独立验收，不要相信 upload 的回执。**
-
-### 3. 填字段（上传中可并行）
-
-**小红书 / 抖音 / B站 在上传中就能填**（省时间）；**视频号锁定，必须等传完**。
-
-字段与选择器见 `references/platforms.md` + `references/selectors.md`。
+小红书、抖音、B站可在上传过程中准备开放的字段。微信视频号在上传完成、字段解锁后填写。各平台确切取值见[内容声明](references/platforms.md#内容声明)，操作位置见[字段控件](references/selectors.md#填写字段)。
 
 **话题必须落成真实实体**，判定方式见 `references/verification.md`。
 
@@ -156,21 +111,23 @@ bsk upload --session $S --tab-id $T --file "$V" --ref '@eNN'
 按比例映射（**以实际分辨率为准，不要信文件名**）：
 
 ```
-3:4  → 小红书  |  抖音竖  |  视频号（⚠️ 2026-09-29 实测：视频号只剩这一个 3:4 槽）
-4:3  → 抖音横  |  B站首页推荐
+3:4  → 小红书  |  抖音竖  |  视频号个人主页（竖屏成片与分享卡片共用）
+4:3  → 抖音横  |  B站首页推荐  |  视频号横屏成片的分享卡片
 16:9 → 仅 B站个人空间
 ```
+
+视频号按**上传成片的显示宽高比**判断。竖屏预期 1 个共用入口，横屏预期 2 个独立入口。等视频处理完成，核对「封面预览」里带「编辑」的卡片名称和比例，再按实际入口分别传图。见[视频号封面](references/platforms.md#视频号封面)。
 
 **⚠️ 验收不能只看"URL 变了"** —— CDN 是内容寻址的，同一张图可能拿回同一个 URL。可靠的回执优先级：
 
 ```
 ① 平台自己吐的质量/完整性回执   小红书「封面效果评估通过」/ 抖音「双封面缺失」警告清零
 ② 槽位的内部绑定输出都在          B站：.cover-content 的 cover-list（extra=4:3 / main=16:9）
-③ 两个槽确实是两份来源            B站：两个面板 canvas 像素比对（中心像、边角不像 = 两份源）
-④ 对话框关闭
+③ 各编辑入口绑定了相应来图         核对卡片名称、比例、可辨识细节和平台图片资源
+④ 编辑对话框关闭并返回主卡片
 ```
 
-**同一张图传两个槽 = 错的。** B站 点「完成」时若问是否同步 4:3 到 16:9 —— **永远选「不同步」**（同步出来的不算第二个槽的证据）。
+两个独立入口分别绑定对应比例的来图。只有部分来图时，报告哪个入口使用了用户文件，哪个保留了平台默认。B站点「完成」若询问是否把 4:3 同步到 16:9，选「不同步」，保留独立的空间封面。
 
 ### 5. 存草稿
 
@@ -185,19 +142,28 @@ B站       存草稿
 
 ### 6. 交付
 
-逐平台报告：
+按平台报告草稿入口、保存时间、原标题、实际话题实体、声明和每张封面对应的卡片及回执。需复开时确认当前账号下同一草稿的内容。封面仅附可公开使用的 URL；需要签名的封面提供平台已接受的证据和草稿入口。
 
-```
-平台 / 视频✅ / 标题 / 话题实体数 / 声明 / 封面URL / 草稿位置
-```
+关心耗时时按步骤 2 的记录交付，例如：
 
-**并明确说明：草稿已就绪，最终发布由人工完成。**
+| 平台 | 开始投递 | 文件已选 | 平台接收或处理完成 | 人工等待起止 | 草稿入箱及证据 |
+|---|---|---|---|---|---|
+| 对应平台 | 当地时间 | 时间及文件回读 | 时间及平台状态 | 起止时间或「无」 | 时间、标题及入口 |
+
+已通过验收的报「草稿就绪，待人工发布」。未通过的报最后成功步骤、保留的页面及剩余事项。
+
+### 7. 留页交接或关闭专用会话
+
+- 上传中、改动未保存、无法确认是否改动、要交给用户接着操作，或视频号最后设置的视频标注只在页内生效时，保留编辑页与会话，并说明用户应从哪一页接手。
+- 仅在确需关闭专用会话时收尾。先确认平台已明确保存、已从列表或复开草稿核验，且核验后人和代理都没有改动。若仍在编辑器，从本任务页向已知的同平台草稿箱（或安全中性页）发起一次显式导航，保留平台的离页保护。
+- 收到 `dialog_pending` 时，用该回执或 `bsk_assist` 的 `dialog-status` 核对会话、标签页、弹窗类型和真实 `dialogId`。只有能归属到上述导航的 `beforeunload` 才可 `dialog-accept`。意外的 `beforeunload` 优先 `dialog-dismiss` 留页，其他类型单独判断。处理后用原 `operationId` 调 `operation-await` 取结果，勿重发导航。原生弹窗本身不表示真人接管，另有接管信号时立即按硬边界停手。
+- 确认已离开编辑器、会话中其余标签页也可关闭后，才对同一会话 `stop`。若 `stop` 超时，用原生命周期 `requestId` 核对或重试同一停止请求。只有明确挂起的操作才有可供 `operation-await` 使用的 `operationId`。
 
 ---
 
 ## 幂等
 
-**重跑同一条流程前，先判断状态，不要无脑重放：**
+按步骤 1 确认目标草稿。重跑或重新连接时，根据页面证据决定下一步：
 
 ```
 目标已完成      → 什么都不做

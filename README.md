@@ -2,7 +2,7 @@
 
 把一条视频准备成 **小红书 / 抖音 / B站 / 微信视频号** 的发布草稿。
 
-上传视频 → 填标题与真实话题实体 → 设内容声明（默认「无需标注」）→ 传多比例封面 → 逐平台独立验收 → **停在最终发布按钮之前**，由人工确认发布。
+上传视频后判断本条作品的主旨、自制来源和 AI 生成素材，再填分区、原创、内容声明、标题与话题，按各入口配置封面。逐平台验收草稿后交给用户确认发布。
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|
 | 上传视频到四个平台后台 | 剪辑、转码 |
 | 填标题、话题（落成平台真实实体） | 制作封面（只上传已有封面） |
-| 设内容声明（默认一律「无需标注」/ 不选） | 点击最终发布 |
+| 自制稿选原创，按成片中使用的生成素材设置 AI 声明 | 点击最终发布 |
 | 上传多比例封面并验收 | 绕过登录、验证码、风控 |
 | 保存草稿、逐平台交付证据 | 预测流量、承诺过审 |
 
@@ -52,19 +52,19 @@ disable-model-invocation: true
 打开弹窗不算数、上传返回成功不算数、下拉列表里出现目标文本不算数。
 **只有平台自己吐出的、绑定了这次操作的回执才算数**——例如封面的接受 URL、话题的实体节点。
 
-细节见 [`references/verification.md`](references/verification.md)。
+每个平台分别记开始上传、平台接收、人工等待起止和草稿入箱的时间及回执。并行任务按平台看耗时，缺失的时间标为「未观测」。详见[验收标准](references/verification.md)。
 
-### 3. 大文件绕开 bsk 的 512 MB 限制
+自制模型实测中展示生成结果时，选原创和对应平台的含 AI 声明；实拍生活 vlog 选原创。B站分区按观众看到的主线匹配投稿页选项，分别核对分区、内容声明和自制授权。见[声明字段](references/platforms.md#内容声明)与[B站真实分区清单](references/bilibili-categories.md)。
 
-`bsk upload` 会把文件**复制一份再分块传输**，因此有单文件 512 MB + 会话累计 512 MB 两道硬限制。
+### 3. 把用户指定的文件交给平台编辑器
 
-超过时改用本地 HTTP 服务 + 页面内注入——**没有大小上限，也不消耗 bsk 额度**：
+优先使用 BrowserSkill 的原生文件上传。本地暂存的单文件和会话累计限额均为 512 MiB。需要本机交付时，指定一份素材和一个官方编辑页来源，从仓库根目录运行：
 
 ```bash
-./scripts/inject-large-file.sh ~/video.mp4 'input.upload-input' --session <id>
+./scripts/inject-large-file.sh "$FILE" --serve-only --origin https://channels.weixin.qq.com
 ```
 
-实测 1.1 GB 注入耗时约 1.5 秒。细节见 [`references/gotchas.md`](references/gotchas.md)。
+助手在回环地址临时提供该文件。DSH 用 `--serve-only` 配合注入的 `bsk_*`；独立 CLI 可沿用 `./scripts/inject-large-file.sh "$FILE" "$SELECTOR" --session "$SESSION" --tab-id "$TAB"`，选择器对应原草稿内已确认的文件框。两种入口共用同一份文件交付与选中回执。视频或封面是否生效，再在编辑页和草稿箱分别核对。见[视频号上传排查](references/gotchas.md#视频号上传排查)。
 
 ### 4. 隐藏 Chrome 的调试横幅
 
@@ -86,7 +86,9 @@ setup/chrome-silent/build.sh   →  产出 ~/Applications/Chrome Silent.app
 git clone <repo> ~/.agents/skills/jack-media-publisher
 ```
 
-然后按 [`setup/prerequisites.md`](setup/prerequisites.md) 过一遍环境清单（三件事：bsk 空闲超时、扩展文件访问权限、静默启动器）。
+首次使用时按[环境前置](setup/prerequisites.md)核对浏览器连接与文件选择权限。长任务空闲时间和静默启动器按需配置。
+
+本机斜杠命令读取安装目录的工作区内容，未提交的文档也可能影响下一次调用。维护时用 `git status --short` 和 `git diff` 核对已有改动，按平台或修复主题分别提交；当前期望值以[平台字段表](references/platforms.md)为准。
 
 ---
 
@@ -101,7 +103,9 @@ git clone <repo> ~/.agents/skills/jack-media-publisher
 │   ├── verification.md           可信信号 vs 陷阱
 │   └── gotchas.md                踩坑记录
 ├── scripts/
-│   └── inject-large-file.sh      大文件注入
+│   ├── inject-large-file.sh      限定素材和平台来源的本机交付入口
+│   └── media-file-input.js       编辑器文件准备与选择，使用控件所属窗口的类型
+├── tests/                        本机交付、组件兼容和平台规则回归
 └── setup/
 │   ├── prerequisites.md          环境前置清单
 │   └── chrome-silent/            静默启动器（源码 + 构建脚本）
@@ -116,10 +120,19 @@ BrowserSkill (bsk)     浏览器操控层
 Google Chrome          实测 153.x
 Node.js                ≥ 20
 ffmpeg                 ≥ 6（探测视频 + 构建图标）
+Python 3               单文件本机交付（标准库）
 ```
 
-**不依赖任何平台的 API key**——全部走浏览器登录态。
-**不依赖 DSH**——这是 agent 通用能力。
+页面操作复用浏览器登录态。DSH 使用已绑定的浏览器工具，独立 CLI 的调用参数见 `./scripts/inject-large-file.sh --help`。
+
+## 本机回归检查
+
+从仓库根目录运行。测试使用临时素材、回环连接和模拟编辑器。
+
+```bash
+python3 -IB -m unittest discover -s tests -p 'test_*.py' -v
+node --test tests/media-file-input.test.mjs
+```
 
 ---
 
@@ -127,4 +140,4 @@ ffmpeg                 ≥ 6（探测视频 + 构建图标）
 
 **平台会改版。** 本项目里的选择器都是实测得出，但都有保鲜期。
 
-失效时先怀疑平台改版，不要怀疑自己的操作。发现改版后请更新 `references/selectors.md`，并把改版记录追加到 `references/gotchas.md`。
+选择器失效时核对现场的可见控件。发现改版后，在平台字段表更新当前规则，在选择器和验收文档更新相应定位与回执，最后在踩坑记录注明适用条件与日期。
