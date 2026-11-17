@@ -122,8 +122,8 @@ ffprobe -v error -show_entries format=duration,size,bit_rate \
 ```bash
 # 小红书  input.upload-input 是 0×0 / opacity:0，直接选它会被拒
 bsk upload --session $S --tab-id $T --file "$V" --selector 'div.drag-over'
-# 抖音    input[type=file] 同样是隐藏的
-bsk upload --session $S --tab-id $T --file "$V" --selector 'div.drag-over'
+# 抖音    当前快照中取「点击上传 或直接将视频文件拖入此区域」的 ref
+bsk upload --session $S --tab-id $T --file "$V" --ref '@eNN'
 # B站     ⚠️ 必须限定在 wrapper 内，且指向可见投放区
 bsk upload --session $S --tab-id $T --file "$V" --selector '.bcc-upload-wrapper div.upload-area'
 # 视频号  input 在 wujie shadow DOM 且不可见 → 用 --ref 指向可见上传区

@@ -269,6 +269,8 @@ V2（文件名）、生活记录、记录、日语现场、音乐现场、LIVE
 
 **所以这份文档里的选择器都有保鲜期。失效时先怀疑改版，不要怀疑自己的操作。**
 
+- **抖音视频上传与封面（2026-11-18）**　视频上传页已找不到 `div.drag-over`。当次快照中「点击上传 或直接将视频文件拖入此区域」的按钮可接收 MOV。两张封面重新打开草稿后分别显示在各自卡片的 `img` 上。
+
 ---
 
 ## 十三、隐藏的 file input 会被 bsk 拒掉（四个平台全踩）
@@ -282,7 +284,7 @@ hint: rerun snapshot and choose a visible child ref, or wait/scroll/reload befor
 
 **这不是权限问题，也不是操作问题——那个元素本来就不占位。**
 
-**修法**：指向**可见的投放区**（小红书/抖音 `div.drag-over`、B站 `.bcc-upload-wrapper div.upload-area`、视频号用 `--ref` 指可见区）。完整的可见祖先探针见 `selectors.md` 的「文件上传」节。
+**修法**：指向**可见的投放区**。小红书用 `div.drag-over`，抖音用当前快照中「点击上传 或直接将视频文件拖入此区域」的按钮 ref，B站用 `.bcc-upload-wrapper div.upload-area`，视频号用 `--ref` 指可见区。完整的可见祖先探针见 `selectors.md` 的「文件上传」节。
 
 ⚠️ 这条和第四条（文件访问权限）**报错完全不同**，别混：几何问题报 `no visible geometry`（本地就能判断），权限问题报 `Not allowed`（要动浏览器设置）。
 

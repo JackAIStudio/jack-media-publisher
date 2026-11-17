@@ -20,7 +20,7 @@ hint: rerun snapshot and choose a visible child ref, or wait/scroll/reload befor
 | 平台 | ✅ 用这个（可见投放区） | ❌ 不要用这个（隐藏 input） |
 |---|---|---|
 | 小红书 | `div.drag-over` | `input.upload-input`（0×0 / opacity 0） |
-| 抖音 | `div.drag-over` | `input[type=file]`（页面唯一但不可见） |
+| 抖音 | 快照中「点击上传 或直接将视频文件拖入此区域」的按钮 ref | `input[type=file]` 不可见。2026-11-18 实测 `div.drag-over` 已匹配不到 |
 | **B站** | **`.bcc-upload-wrapper div.upload-area`** | `.bcc-upload-wrapper input[type=file]` |
 | 视频号 | `--ref '@eNN'` 指向可见上传区 | shadow DOM 里的 `input[type=file]` |
 
@@ -245,6 +245,8 @@ const read = id => { const cv = document.querySelector('#' + id + ' canvas'); co
 ```
 
 切换 tab 时可能弹「使用此素材作为封面？」→ 点「直接编辑」。
+
+2026-11-18 实测，发布页的两张卡片各自标有「竖封面3:4」和「横封面4:3」。重新进草稿后，从各卡片内的 `img.currentSrc` 回读平台接受的两份图片。卡片父元素的 `background-image` 可以仍是 `none`。
 
 ### 视频号：两个编辑入口
 
