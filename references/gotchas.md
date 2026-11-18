@@ -257,6 +257,9 @@ V2（文件名）、生活记录、记录、日语现场、音乐现场、LIVE
 **所以这份文档里的选择器都有保鲜期。失效时先怀疑改版，不要怀疑自己的操作。**
 
 - **抖音视频上传与封面（2026-11-18）**　视频上传页已找不到 `div.drag-over`。当次快照中「点击上传 或直接将视频文件拖入此区域」的按钮可接收 MOV。两张封面重新打开草稿后分别显示在各自卡片的 `img` 上。
+- **小红书横图 4:3 裁剪与原创开关（2026-11-18）**　上传 4:3 横图到小红书封面编辑器时，默认仍选中左侧「3:4」比例框，必须切「裁剪 → 4:3」后再点「完成」；原创声明原生 checkbox 为 `0×0` 不可见，须点 `.custom-switch-card .d-switch`，并在《原创声明须知》弹窗勾选 `.originalContainer .d-checkbox-simulator`。
+- **B 站登录接口跨域与自制授权（2026-11-18）**　在 `member.bilibili.com` 调 `https://api.bilibili.com/x/web-interface/nav` 时必须传 `{ credentials: "include" }`，否则会漏带 Cookie 误报 `code=-101`。「内容为自制：未经作者允许，禁止转载」（`.auth-content`）在「创作声明」下拉底部，可与「含AI生成内容」同时勾存；主表单缩略图用 `.cover-img` CSS `background-image` 渲染。
+- **视频号第二卡继承提示与媒体静音（2026-11-18）**　横屏视频设完个人主页 3:4 后点分享卡片 4:3「编辑」可能先浮出「使用此素材作为封面？」，须点「直接编辑」再上传 4:3 图。操作期间应对主文档及 `wujie-app` shadow root 内的 `<video>`/`<audio>` 设 `muted = true; pause()`（不改 `volume`），留页交接前保持暂停并还原 `muted = false`。
 
 ---
 

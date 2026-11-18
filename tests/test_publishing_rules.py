@@ -47,6 +47,14 @@ class PublishingRules(unittest.TestCase):
                 text = path.read_text(encoding='utf-8')
                 self.assertNotRegex(text, r'视频号[^\n]*(?:只剩单一|只剩这一个|两个都要变)|横屏封面在视频号[^\n]*没有槽可放')
 
+    def test_xiaohongshu_orientation_cover_rule(self):
+        for rel in ('SKILL.md', 'references/platforms.md', 'references/verification.md'):
+            text = (ROOT / rel).read_text(encoding='utf-8')
+            with self.subTest(file=rel):
+                self.assertRegex(text, r'竖屏[^\n]*3:4')
+                self.assertRegex(text, r'横屏[^\n]*4:3')
+                self.assertNotRegex(text, r'默认\s*3:4\s*竖屏|封面默认用\s*3:4\s*竖图')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -48,9 +48,9 @@ const sameRealmFile = !!file && file instanceof componentWindow.File;
 
 ### 内容声明控件
 
-小红书读内容类型声明行 `.d-select` 的显示区。抖音在自主声明弹窗内选定并点「确定」，回读表单上 `.selectBox-buZRzi` 的文本。微信视频号读「视频标注」行收起后的按钮。本条成片对应的值见[内容声明](platforms.md#内容声明)。
+小红书读内容类型声明行 `.d-select` 的显示区；原创声明原生 checkbox 为 `0×0` 不可见，须点击 `.custom-switch-card .d-switch`，并在《原创声明须知》弹窗勾选 `.originalContainer .d-checkbox-simulator` 后点「声明原创」。抖音在自主声明弹窗内选定并点「确定」，回读表单上 `.selectBox-buZRzi` 的文本。微信视频号读「视频标注」行收起后的按钮，并核对「声明原创」（`.declare-original-checkbox` + `.declare-original-dialog` 确认弹窗）与「位置」（表单 `.post-position-wrap .location-name`）。本条成片对应的值见[内容声明](platforms.md#内容声明)。
 
-B站在「创作声明」下拉的六个 `.bcc-option` 中核对带选中标记的项，收起后回读该行 `input.bcc-select-input-inner` 的显示值。下方「是否添加内容授权声明（非必选）」内的 `.auth-content` 是自制授权文案，需另读对应勾选控件。若输入框显示授权文案，仍按两处实际选中状态记录，无法确认的项注明待核实。
+B站在「创作声明」下拉的六个 `.bcc-option` 中核对带选中标记的项，收起后回读该行 `input.bcc-select-input-inner` 的显示值。下方「是否添加内容授权声明（非必选）」内的 `.auth-content`（「内容为自制：未经作者允许，禁止转载」）就在同一 `.bcc-select-option-list` 下拉底部，2026-11-18 实测可与「含AI生成内容」同时勾存（选中含 `.option-text-selected`）。设置后分别按两处实际选中状态回读，无法确认的项注明待核实。
 
 各平台在实际显示的「原创」「自制」或内容授权行，回读对应控件的 `checked`、`aria-checked` 或选中标记。
 
@@ -103,9 +103,9 @@ document.execCommand('insertText', false, '要填的内容');
 
 ## 封面
 
-### 小红书：hover-only 入口
+### 小红书：hover-only 入口与 4:3 裁剪切换
 
-悬停主封面卡，待 `.cover-edit-entry` 可见后从当前快照点选。编辑器 `.main-cover-editor-modal` 有时只显示「上传」和「完成」。从该弹窗的可见入口选图，图片输入框可按 `input.upload-input[accept*="image"]` 核对。
+悬停主封面卡（`.default--ai-cover-layout` 或触发 `.cover-edit-entry`），从当前快照点选进入 `.main-cover-editor-modal`。在弹窗上传控件 `input[aria-label="上传封面图片"]`（或 `input.upload-input[accept*="image"]`）选图后，**若为横屏视频传 4:3 横封面，务必切到左侧「裁剪」点击「4:3」比例按钮**（弹窗默认仍选中 3:4），目视确认未裁切后点击「完成」。图片输入框可按 `input.upload-input[accept*="image"]` 核对。
 
 ### B站：两个独立面板
 
@@ -129,7 +129,7 @@ tok(document.querySelector('#editor_16_9'));   // ["inactive"]
 
 ⚠️ 用 `/active/.test(className)` 会**误判** —— 它会匹配上 `inactive`。必须按空格切成 token 再比。
 
-点目标面板，回读父元素的 `active` token 后在该面板选图。编辑器里的「完成」控件是 `div.button.submit`。确认后可在主表单 `.cover-content` 的 `cover-list` 回读两份绑定，`extra` 对应 4:3，`main` 对应 16:9。每槽和用户来图的核对方法见[封面验收](verification.md#封面)。
+点目标面板，回读父元素的 `active` token 后在该面板选图。编辑器里的「完成」控件是 `div.button.submit`。确认后主表单 `.cover-content` 的缩略图用 `.cover-img` 的 CSS `background-image` 渲染（非 `<img>`），可在 `.cover-content` 的 `coverList` 回读两份绑定：`extra` 对应 4:3、`main` 对应 16:9（复开同一 `draftId` 后常从 `edited` 移入 `origin`）。每槽和用户来图的核对方法见[封面验收](verification.md#封面)。
 
 ### 抖音：横竖两个 tab
 
@@ -144,6 +144,6 @@ tok(document.querySelector('#editor_16_9'));   // ["inactive"]
 
 ### 微信视频号的封面编辑入口
 
-在主页面「封面预览」按名称和比例找到本张卡片，再取卡内「编辑」（如 `.edit-btn`）的 ref。处理后实际卡片与用图见[微信视频号封面](platforms.md#视频号封面)。
+在主页面「封面预览」按名称和比例找到本张卡片，再取卡内「编辑」（如 `.vertical-img-wrap .edit-btn` / `.horizon-img-wrap .edit-btn`）的 ref。横屏设完个人主页 3:4 后点分享卡片 4:3「编辑」可能先浮出「使用此素材作为封面？」提示，须点「直接编辑」真正进入编辑弹窗。处理后实际卡片与用图见[微信视频号封面](platforms.md#视频号封面)。
 
-在当前编辑区点「上传封面」选对应来图，核对画面后重新快照取「确认」的 ref。确认后回到同一张主卡片核对，再处理下一张有来图的卡片。
+在当前编辑区点「上传封面」选对应来图，核对画面后重新快照取「确认」的 ref。确认后回到同一张主卡片核对，再处理下一张有来图的卡片。草稿箱列表中可通过对应卡片操作区的 `.opr-item .icon-edit` 复开草稿。
