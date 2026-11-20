@@ -56,5 +56,14 @@ class PublishingRules(unittest.TestCase):
                 self.assertNotRegex(text, r'默认\s*3:4\s*竖屏|封面默认用\s*3:4\s*竖图')
 
 
+    def test_no_activity_association_rule(self):
+        for rel in ('SKILL.md', 'references/platforms.md', 'references/verification.md', 'references/gotchas.md'):
+            text = (ROOT / rel).read_text(encoding='utf-8')
+            with self.subTest(file=rel):
+                self.assertRegex(text, r'关联活动|禁止关联活动')
+                self.assertIn('取消关联', text)
+                self.assertNotRegex(text, r'走「参与话题\s*→\s*搜索更多话题」，精确选词并确认')
+
+
 if __name__ == '__main__':
     unittest.main()
